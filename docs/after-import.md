@@ -141,6 +141,30 @@ Meta's long-lived tokens die at 60 days and **cannot be refreshed once expired.*
 
 ---
 
+## 6. The error workflow
+
+`error-workflow.json` is a separate three-node workflow: Error Trigger → build the message → send it to Telegram. It fires on **any** failed execution of the main pipeline and tells you the workflow name, the node that failed, the execution id and the error text.
+
+1. Import `error-workflow.json` as its own workflow. You do **not** need to publish or activate it — n8n's docs: *"If a workflow uses the Error Trigger node, you don't have to publish the workflow."*
+2. Open the main pipeline → `⋯` → **Settings** → **Error Workflow** → pick it.
+3. It reuses `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`. Nothing new to configure.
+
+**⚠️ Step 2 does not travel with the file.** The `settings` block is not applied on import — same trap as the timezone and execution-data settings in step 1. Set it by hand.
+
+**⚠️ You cannot test this with a manual run.** n8n's own docs are explicit: *"You can't test error workflows when running workflows manually. The Error Trigger only runs when an automatic workflow errors."* To test it, activate the main workflow, break one node's URL, and wait for a scheduled run — or fire the production webhook. A manual run will fail silently and you will conclude the alert is broken when it is not.
+
+**Why the alert handles two shapes.** The Error Trigger emits `execution.*` when a node fails mid-run, and `trigger.*` — with no `execution` object at all — when the trigger itself dies. An alert that only reads `execution` goes quiet in exactly the case you most need it: the schedule stopped firing. This one reads both.
+
+**What it does not do.** It reports failures. It cannot report a *run that never happened* — a disabled trigger, a paused workflow, an expired credential in a half nobody triggers. That is a different problem and it is the one that cost me sixteen days. See *The 16 days* in the README.
+
+### Why the four publish nodes do not retry
+
+Every outbound request in `workflow.json` ships with **Retry On Fail** on, **Max. Tries 3**, **Wait Between Tries 5000 ms** — except `Threads Publish`, `Threads Publish Reply 1`, `Threads Publish Reply 2` and `IG Publish Carousel`, which have retry off.
+
+A request can time out *after* the platform has already accepted it. Retrying that is a second post. A container that gets created twice is wasted quota; a post that goes out twice is on someone's feed. **Retry the cheap half, fail loudly on the half you cannot undo.**
+
+---
+
 ## When it breaks
 
 1. Open the failed execution, click the red node, read the **Output** tab. n8n's message is a wrapper; the real error is inside.
