@@ -108,6 +108,8 @@ That is the failure mode this is built around: **it succeeds and does nothing.**
 
 `workflow.json` — credentials stripped, prompts parameterised. Import it, fill the variables, run it. Nothing is locked to me.
 
+`error-workflow.json` — a three-node workflow that catches any failed execution of the pipeline and sends the failing node and the error text to Telegram. Import it too and set it as this workflow's Error Workflow. Details in [`docs/after-import.md`](docs/after-import.md).
+
 ---
 
 ## Security
@@ -116,6 +118,7 @@ That is the failure mode this is built around: **it succeeds and does nothing.**
 - **A disabled node is a disabled alarm.** My safety-gate notification was switched off. The gate still blocked content; it just stopped telling me. It ships enabled here.
 - **The credential that writes credentials.** The refresh jobs use an n8n API key that can update every credential on the instance. Scope it to `credential:read,update,list` and know where it lives.
 - **Execution data is where secrets sit.** If a token passes through a request body, disable execution saving on that workflow — and re-check after every import, because the setting does not travel with the file.
+- **Retries are not free on an irreversible call.** Every outbound request in here ships with Retry On Fail, Max. Tries 3, Wait Between Tries 5000 ms — except the four that actually publish, which have retry off. A publish that times out after the platform already accepted it would post twice on retry, and a published post cannot be recalled. Those four fail loudly instead, and the error workflow tells you.
 - **Known and not fixed:** the publish path still has no independent end-to-end health check. The daily refresh exercises the credential — which is what caught the failure above — but does not prove a post would succeed. A real canary would publish to a private target on a schedule. I have not built that.
 
 ---

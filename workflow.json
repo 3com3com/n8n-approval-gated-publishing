@@ -152,7 +152,10 @@
           "id": "",
           "name": "Anthropic API"
         }
-      }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
     },
     {
       "parameters": {
@@ -204,7 +207,10 @@
           "id": "",
           "name": "Anthropic API"
         }
-      }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
     },
     {
       "parameters": {
@@ -256,7 +262,10 @@
           "id": "",
           "name": "Anthropic API"
         }
-      }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
     },
     {
       "parameters": {
@@ -299,7 +308,10 @@
         2288,
         624
       ],
-      "credentials": {}
+      "credentials": {},
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
     },
     {
       "parameters": {
@@ -365,7 +377,10 @@
           "id": "",
           "name": "OpenAI API"
         }
-      }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
     },
     {
       "parameters": {
@@ -500,7 +515,10 @@
       "position": [
         5136,
         912
-      ]
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
     },
     {
       "parameters": {
@@ -527,7 +545,10 @@
       "position": [
         5296,
         752
-      ]
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
     },
     {
       "parameters": {
@@ -554,7 +575,10 @@
       "position": [
         224,
         1120
-      ]
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
     },
     {
       "parameters": {
@@ -699,7 +723,10 @@
           "id": "",
           "name": "Threads Query Auth"
         }
-      }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
     },
     {
       "parameters": {
@@ -748,7 +775,10 @@
           "id": "",
           "name": "Perplexity API"
         }
-      }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
     },
     {
       "parameters": {
@@ -813,7 +843,10 @@
           "id": "",
           "name": "Anthropic API"
         }
-      }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
     },
     {
       "parameters": {
@@ -839,7 +872,10 @@
           "id": "",
           "name": "Threads Query Auth"
         }
-      }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
     },
     {
       "parameters": {
@@ -901,7 +937,10 @@
           "id": "",
           "name": "Anthropic API"
         }
-      }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
     },
     {
       "parameters": {
@@ -997,7 +1036,10 @@
           "id": "",
           "name": "Anthropic API"
         }
-      }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
     },
     {
       "parameters": {
@@ -1048,7 +1090,10 @@
           "id": "",
           "name": "Threads Query Auth"
         }
-      }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
     },
     {
       "parameters": {
@@ -1112,7 +1157,10 @@
           "id": "",
           "name": "Anthropic API"
         }
-      }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
     },
     {
       "parameters": {
@@ -1154,7 +1202,10 @@
         624
       ],
       "id": "059d82e5-d4b4-40de-abfe-5e34b762129e",
-      "name": "Upload to Cloudinary 1"
+      "name": "Upload to Cloudinary 1",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
     },
     {
       "parameters": {
@@ -1180,7 +1231,10 @@
           "id": "",
           "name": "OpenAI API"
         }
-      }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
     },
     {
       "parameters": {
@@ -1209,7 +1263,10 @@
         624
       ],
       "id": "26c34904-fdd6-44d8-aca6-f60b55cff21c",
-      "name": "Upload to Cloudinary 2"
+      "name": "Upload to Cloudinary 2",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
     },
     {
       "parameters": {
@@ -1235,7 +1292,10 @@
           "id": "",
           "name": "OpenAI API"
         }
-      }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
     },
     {
       "parameters": {
@@ -1264,7 +1324,10 @@
         624
       ],
       "id": "13a284a7-f66a-4bc2-9e51-6e0950db53b2",
-      "name": "Upload to Cloudinary 3"
+      "name": "Upload to Cloudinary 3",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
     },
     {
       "parameters": {
@@ -1290,7 +1353,10 @@
           "id": "",
           "name": "Instagram Query Auth"
         }
-      }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
     },
     {
       "parameters": {
@@ -1316,7 +1382,10 @@
           "id": "",
           "name": "Instagram Query Auth"
         }
-      }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
     },
     {
       "parameters": {
@@ -1369,7 +1438,10 @@
           "id": "",
           "name": "Instagram Query Auth"
         }
-      }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
     },
     {
       "parameters": {
@@ -1482,7 +1554,10 @@
           "id": "",
           "name": "Instagram Query Auth"
         }
-      }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
     }
   ],
   "connections": {

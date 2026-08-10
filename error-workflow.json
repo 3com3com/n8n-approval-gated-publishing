@@ -1,0 +1,91 @@
+{
+  "name": "Error handler - publishing pipeline",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "err-trigger-0001",
+      "name": "Error Trigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build one plain-text alert from whatever the Error Trigger gives us.\n// The trigger has TWO output shapes and they share almost no fields:\n//   - a node failed mid-run  -> $json.execution.{id,url,mode,lastNodeExecuted,error.message}\n//   - the trigger itself died -> $json.trigger.{mode,error.{node,message,timestamp}}\n// Reading only the first one is why most error workflows go quiet exactly when\n// the schedule stops firing. Handle both.\n\nconst w = $json.workflow || {};\nconst e = $json.execution || null;\nconst t = $json.trigger || null;\n\nlet source, failedAt, mode, execId, url, raw;\n\nif (e) {\n  source   = 'EXECUTION FAILED';\n  failedAt = e.lastNodeExecuted;\n  mode     = e.mode;\n  execId   = e.id;\n  url      = e.url;\n  raw      = (e.error && e.error.message) || '';\n} else if (t) {\n  source   = 'TRIGGER FAILED';\n  failedAt = t.error && t.error.node;\n  mode     = t.mode;\n  raw      = (t.error && t.error.message) || '';\n} else {\n  source = 'WORKFLOW FAILED';\n  raw    = 'The error trigger fired with a payload this alert does not recognise.';\n}\n\n// Never let a stack trace or a long API body blow past Telegram's 4096-char limit.\nconst message = String(raw || 'no message').slice(0, 1200);\nconst line = (label, value) => (value ? label + ': ' + value + '\\n' : '');\n\nconst text =\n  source + '\\n\\n' +\n  line('workflow', w.name) +\n  line('failed at', failedAt) +\n  line('mode', mode) +\n  line('execution', execId) +\n  '\\n' + message +\n  (url ? '\\n\\n' + url : '');\n\nreturn [{ json: { text } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "id": "err-format-0002",
+      "name": "Build Alert"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { chat_id: $env.TELEGRAM_CHAT_ID, text: $json.text } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        0
+      ],
+      "id": "err-notify-0003",
+      "name": "Notify Failure",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    }
+  ],
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Build Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Alert": {
+      "main": [
+        [
+          {
+            "node": "Notify Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "all",
+    "saveManualExecutions": false,
+    "timezone": "UTC"
+  },
+  "pinData": {}
+}
