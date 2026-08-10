@@ -1,0 +1,2161 @@
+{
+  "name": "n8n-approval-gated-publishing",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 18 * * *"
+            },
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            },
+            {
+              "field": "cronExpression",
+              "expression": "0 12 * * *"
+            }
+          ]
+        }
+      },
+      "id": "0b397019-f2fb-48dd-b705-a3fb8ddbd2bd",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -144,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f171edd8-9d75-47d4-9df5-0eae7983a0ca",
+              "name": "timezone",
+              "value": "={{ $env.TIMEZONE }}",
+              "type": "string"
+            },
+            {
+              "id": "fe17be18-6968-4003-9ac9-df3ec7da2cef",
+              "name": "slot_1",
+              "value": "={{ $env.SLOT_1 }}",
+              "type": "string"
+            },
+            {
+              "id": "069bd107-394a-4b41-8fea-c0928167cb3c",
+              "name": "slot_2",
+              "value": "={{ $env.SLOT_2 }}",
+              "type": "string"
+            },
+            {
+              "id": "1f9138b2-3eb5-4377-94b3-7273b8e6befb",
+              "name": "claude_model",
+              "value": "claude-sonnet-4-5",
+              "type": "string"
+            },
+            {
+              "id": "644f1ae8-ba18-4445-a021-11c1560739b1",
+              "name": "openai_image_model",
+              "value": "gpt-image-1",
+              "type": "string"
+            },
+            {
+              "id": "c15ba4f4-2c8b-40f2-a1b5-2e26a1664e01",
+              "name": "dry_run",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "7c263049-d5a6-48bf-82b0-cb0d775012e9",
+              "name": "safety_mode",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "3940ea98-efea-4afa-ade5-7ebcd8afb23c",
+              "name": "slot_mode",
+              "value": "={{ ['09','18'].includes($json.Hour) ? $env.TOPIC_A : $env.TOPIC_B }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "61d9c072-d861-488c-9c12-232ef47c8e31",
+      "name": "Set Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        48,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $json.content?.[0]?.text || $json.completion || JSON.stringify($json);\nconst stripped = raw\n  .replace(/^```json\\s*/i, '')\n  .replace(/^```\\s*/i, '')\n  .replace(/\\s*```$/i, '')\n  .trim();\nlet parsed;\ntry {\n  parsed = JSON.parse(stripped);\n} catch (e) {\n  const m = stripped.match(/\\{[\\s\\S]*\\}/);\n  if (!m) throw new Error('Parse EN failed. Raw: ' + stripped.slice(0, 300));\n  parsed = JSON.parse(m[0]);\n}\n\nconst topicData = $('Generate Topic1').first().json;\nconst { name: _n, id: _i, ...safeTopicData } = topicData;\n\nreturn [{\n  json: {\n    ...safeTopicData,\n    english_json: parsed,\n    english_json_str: JSON.stringify(parsed)\n  }\n}];"
+      },
+      "id": "4b56a9ff-062a-4abf-9763-1bf118228fee",
+      "name": "Parse EN JSON",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        928,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "jsonHeaders": "={\n  \"anthropic-version\": \"2023-06-01\",\n  \"content-type\": \"application/json\"\n}",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "claude-sonnet-4-5-20250929"
+            },
+            {
+              "name": "max_tokens",
+              "value": "={{ 1200 }}"
+            },
+            {
+              "name": "temperature",
+              "value": "={{ 0.3 }}"
+            },
+            {
+              "name": "messages",
+              "value": "={{ [{\"role\":\"user\",\"content\":\"Translate this JSON to Russian. Keep all keys exactly the same. Return only valid JSON, no markdown:\\nhook: \" + $json.english_json.hook + \"\\nmain_point: \" + $json.english_json.main_point + \"\\nbullets: \" + JSON.stringify($json.english_json.bullets) + \"\\nclosing: \" + $json.english_json.closing + \"\\nx_hook: \" + $json.english_json.x_hook + \"\\nx_bullets: \" + JSON.stringify($json.english_json.x_bullets) + \"\\nx_cta: \" + $json.english_json.x_cta + \"\\nx_closing: \" + $json.english_json.x_closing + \"\\ninternal_tag: \" + $json.english_json.internal_tag + \"\\nOutput JSON only: {\\\"hook\\\":\\\"...\\\",\\\"main_point\\\":\\\"...\\\",\\\"bullets\\\":[\\\"...\\\",\\\"...\\\",\\\"...\\\"],\\\"closing\\\":\\\"...\\\",\\\"x_hook\\\":\\\"...\\\",\\\"x_bullets\\\":[\\\"...\\\",\\\"...\\\"],\\\"x_cta\\\":\\\"...\\\",\\\"x_closing\\\":\\\"...\\\",\\\"internal_tag\\\":\\\"...\\\"}\"}] }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "38ef6516-4823-4185-a9c4-010f43c4a707",
+      "name": "Claude Translate (target language)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1152,
+        624
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "",
+          "name": "Anthropic API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $json.content?.[0]?.text \n  || $json.completion \n  || JSON.stringify($json);\n\nconst stripped = raw\n  .replace(/^```json\\s*/i, '')\n  .replace(/^```\\s*/i, '')\n  .replace(/\\s*```$/i, '')\n  .trim();\n\nlet parsed;\ntry {\n  parsed = JSON.parse(stripped);\n} catch (e) {\n  const m = stripped.match(/\\{[\\s\\S]*\\}/);\n  if (!m) throw new Error('Raw: ' + stripped.slice(0, 300));\n  try {\n    parsed = JSON.parse(m[0]);\n  } catch (e2) {\n    throw new Error('Extracted: ' + m[0].slice(0, 300));\n  }\n}\n\nreturn [{\n  json: {\n    ...$('Parse EN JSON').first().json,\n    russian_json: parsed\n  }\n}];"
+      },
+      "id": "20d94043-ba40-4d9e-8d56-1e010c083629",
+      "name": "Parse RU JSON",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1328,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"claude-sonnet-4-5-20250929\",\n  \"max_tokens\": 900,\n  \"temperature\": 0.3,\n  \"system\": \"You create Instagram carousel slides for a calm, intelligent {{ $env.NICHE }} education account. The voice is like a sharp insider — informed, precise, slightly premium. Never hype.\\n\\nSLIDE STRUCTURE:\\n- Slide 1 (Hook): One bold claim or surprising fact. Under 12 words. Make them stop scrolling.\\n- Slide 2 (The Math): One formula, comparison, or number that proves the point. Keep it visual-friendly.\\n- Slide 3 (Reality Check): 3 short bullet points — what most people think vs. what's true\\n- Slide 4 (Takeaway + CTA): One sentence conclusion + 'Save this' or 'Share with someone who needs this'\\n\\nDESIGN NOTES:\\n- Each slide = max 3 lines of text\\n- Numbers and contrasts are stronger than explanations\\n- Use em-dash (—) for impact\\n\\nReturn JSON only with keys: slide_1, slide_2, slide_3, slide_4.\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"=Create 4 Instagram carousel slides for this content:\\nHook: {{ $json.english_json.hook }}\\nMain point: {{ $json.english_json.main_point }}\\nBullets: {{ $json.english_json.bullets }}\\nClosing: {{ $json.english_json.closing }}\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "47ac99f6-0d45-45b4-b8f2-f6943c22f5e5",
+      "name": "Claude IG Slides",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1520,
+        624
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "",
+          "name": "Anthropic API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst raw = $json.content?.[0]?.text || $json.completion || JSON.stringify($json);\nlet parsed;\ntry { parsed = JSON.parse(raw); } catch (e) {\n  const m = raw.match(/\\{[\\s\\S]*\\}/);\n  if (!m) throw new Error('Slides output is not valid JSON');\n  parsed = JSON.parse(m[0]);\n}\nreturn [{ json: { ...$('Parse RU JSON').first().json, ...parsed } }];\n"
+      },
+      "id": "48a335fe-5482-4117-b24f-edf5df68b526",
+      "name": "Parse Slides JSON",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1712,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"claude-sonnet-4-5-20250929\",\n  \"max_tokens\": 500,\n  \"temperature\": 0.3,\n  \"system\": \"You extract image generation directions from {{ $env.NICHE }} education content. Two types of images perform best:\\n\\nTYPE A — DIAGRAM: Clean infographic. Dark background (#0a0a0a or deep navy). One dominant number or formula in gold or white. Minimal text. Feels like a premium data visualization.\\n\\nTYPE B — CINEMATIC SCENE: Describe the physical environment your subject matter lives in — objects, materials, lighting. One human element (posture, gesture) that suggests focus and intelligence. No faces needed. Mood: calm confidence, not excitement.\\n\\nSelect the type that best matches the content. Diagrams work for quantitative content. Scenes work for narrative content.\\n\\nReturn JSON only with keys: type (diagram or scene), scene, objects, focus, mood, color_palette, image_prompt (50 words max, ready for GPT-image-1).\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"=Extract visual direction for this content:\\nHook: {{ $json.english_json.hook }}\\nMain point: {{ $json.english_json.main_point }}\\nInternal tag: {{ $json.english_json.internal_tag }}\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "969db193-3621-4521-918b-5953cd7be9e6",
+      "name": "Claude Visual Extractor",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1904,
+        624
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "",
+          "name": "Anthropic API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst raw = $json.content?.[0]?.text || $json.completion || JSON.stringify($json);\nlet parsed;\ntry { parsed = JSON.parse(raw); } catch (e) {\n  const m = raw.match(/\\{[\\s\\S]*\\}/);\n  if (!m) throw new Error('Visual summary output is not valid JSON');\n  parsed = JSON.parse(m[0]);\n}\nreturn [{ json: { ...$('Parse Slides JSON').first().json, visual_summary: parsed } }];\n"
+      },
+      "id": "eb3185ee-f712-4231-946c-d6382761a284",
+      "name": "Parse Visual JSON",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2096,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/responses",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"gpt-4o\",\n  \"input\": \"=Create a detailed image generation prompt based on:\\ntype={{ $json.visual_summary.type }}\\nscene={{ $json.visual_summary.scene }}\\nobjects={{ $json.visual_summary.objects }}\\nfocus={{ $json.visual_summary.focus }}\\nmood={{ $json.visual_summary.mood }}\\ncolor_palette={{ $json.visual_summary.color_palette }}\\n\\nStyle rules:\\n- If type=diagram: clean infographic, dark background, gold/white typography, one dominant number, no people\\n- If type=scene: cinematic environment for the niche, dramatic low lighting, no faces, photorealistic\\n- No text overlays, no stock photo feel, no bright neon\\n\\nReturn only the image prompt text, max 80 words.\",\n  \"max_output_tokens\": 300\n}",
+        "options": {}
+      },
+      "id": "58d31523-357c-4ba3-adb9-39bdfcc76295",
+      "name": "OpenAI Image Prompt",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2288,
+        624
+      ],
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst prompt = $json.output?.[0]?.content?.[0]?.text || $json.output_text || JSON.stringify($json);\nreturn [{ json: { ...$('Parse Visual JSON').first().json, image_prompt: String(prompt).trim() } }];\n"
+      },
+      "id": "8c2634ea-6bf3-4c83-ab93-6c9ad7ddb41b",
+      "name": "Parse Image Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2464,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/images/generations",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "gpt-image-1"
+            },
+            {
+              "name": "prompt",
+              "value": "={{ $json.prompt_1 }}"
+            },
+            {
+              "name": "n",
+              "value": "={{ 1 }}"
+            },
+            {
+              "name": "size",
+              "value": "1024x1024"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "528c096d-ab32-4655-b58d-9fde9fba394d",
+      "name": "OpenAI Generate Image",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3024,
+        624
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "",
+          "name": "OpenAI API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const banned = [\n  /guaranteed win/i,\n  /easy money/i,\n  /risk[- ]?free/i,\n  /beat the system/i,\n  /sure profit/i\n];\nconst imageB64 = $('OpenAI Generate Image').first().json.data?.[0]?.b64_json || null;\nconst source = $('Parse Image Prompt').first().json;\nconst englishJson = source.english_json || {};\nconst russianJson = source.russian_json || englishJson;\nconst fullEn = [\n  englishJson.hook, englishJson.main_point,\n  ...(englishJson.bullets || []), englishJson.closing,\n  englishJson.x_hook, ...(englishJson.x_bullets || []), englishJson.x_cta\n].join(' ');\nconst fullRu = [\n  russianJson.hook, russianJson.main_point,\n  ...(russianJson.bullets || []), russianJson.closing,\n  russianJson.x_hook, ...(russianJson.x_bullets || []), russianJson.x_cta\n].join(' ');\nconst hit = banned.find((re) => re.test(fullEn) || re.test(fullRu));\nconst disclaimerEn = source.disclaimer_en || ((typeof $env !== 'undefined' ? $env : {}).DISCLAIMER_PRIMARY || 'Educational content only. No guarantees.');\nconst disclaimerRu = source.disclaimer_ru || ((typeof $env !== 'undefined' ? $env : {}).DISCLAIMER_SECONDARY || (typeof $env !== 'undefined' ? $env : {}).DISCLAIMER_PRIMARY || 'Educational content only. No guarantees.');\nconst buildXText = (json, disclaimer) => {\n  const hook = json.x_hook || json.hook || '';\n  const bullets = (json.x_bullets || json.bullets || []).slice(0, 2).map(b => `• ${b}`).join('\\n');\n  const cta = json.x_cta || '';\n  const full = `${hook}\\n\\n${bullets}\\n\\n${cta}\\n\\n${disclaimer}`;\n  return full.length <= 280 ? full : full.slice(0, 277) + '…';\n};\nconst pillar = source.pillar || 'pillar_a';\nconst topic = source.topic || '';\nconst baseHashtags = {\n  pillar_a: (((typeof $env !== 'undefined' ? $env : {}).HASHTAGS_PILLAR_A || '#TagA1 #TagA2 #TagA3').split(' ')),\n  pillar_b: (((typeof $env !== 'undefined' ? $env : {}).HASHTAGS_PILLAR_B || '#TagB1 #TagB2 #TagB3').split(' ')),\n};\nconst topicHashtags = {\n  // optional: map a topic keyword to extra tags\n  // example_topic: ['#TagX1', '#TagX2'],\n};\nconst universalHashtags = (((typeof $env !== 'undefined' ? $env : {}).HASHTAGS_UNIVERSAL || '#TagU1 #TagU2').split(' '));\nconst getHashtags = (pillar, topic) => {\n  const base = baseHashtags[pillar] || baseHashtags['pillar_a'];\n  const topicKey = Object.keys(topicHashtags).find(k => topic.toLowerCase().includes(k));\n  const topicTags = topicKey ? topicHashtags[topicKey] : [];\n  const all = [...base, ...topicTags, ...universalHashtags];\nreturn [...new Set(all)].slice(0, 5).join(' ');\n};\nconst hashtagsEn = getHashtags(pillar, topic);\nconst hashtagsRu = ((typeof $env !== 'undefined' ? $env : {}).HASHTAGS_SECONDARY_LANG || '#TagS1 #TagS2 #TagS3');\n\nconst buildIgCaption = (hook, mainPoint, closing, disclaimer, hashtags) => {\n  const full = `${hook}\\n\\n${mainPoint}\\n\\n${closing}\\n\\n${disclaimer}\\n\\n${hashtags}`;\n  if (full.length <= 500) return full;\n  const withoutClosing = `${hook}\\n\\n${mainPoint}\\n\\n${disclaimer}\\n\\n${hashtags}`;\n  if (withoutClosing.length <= 500) return withoutClosing;\n  return `${hook}\\n\\n${disclaimer}\\n\\n${hashtags}`.slice(0, 500);\n};\n\nreturn [{\n  json: {\n    ...source,\n    image_b64: imageB64,\n    safe: !hit,\n    safety_reason: hit ? `Matched banned pattern: ${hit}` : 'pass',\n    x_text_en: buildXText(englishJson, disclaimerEn),\n    x_text_ru: buildXText(russianJson, disclaimerRu),\n    ig_caption_en: buildIgCaption(englishJson.hook, englishJson.main_point, englishJson.closing, disclaimerEn, hashtagsEn),\n    ig_caption_ru: buildIgCaption(russianJson.hook, russianJson.main_point, russianJson.closing, disclaimerRu, hashtagsRu),\n    hashtags_en: hashtagsEn,\n    hashtags_ru: hashtagsRu\n  }\n}];"
+      },
+      "id": "281ae23e-57aa-447d-b2e2-d3ea6cf4b0f1",
+      "name": "Format + Safety Gate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4288,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "95bd4768-bfa6-42bd-87a0-6ff5edf86bc4",
+              "leftValue": "={{ $json.safe }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "6f1bd3e5-1f28-41b9-b535-080e9828485d",
+      "name": "IF Safe?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        4496,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "1a44b29b-42b0-4237-8e1f-4003cb5cd805",
+              "leftValue": "={{ $json.query.action }}",
+              "rightValue": "approve",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "28147952-fccc-4e4f-bb0f-87f452fa8bec",
+      "name": "IF Approved?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        32,
+        928
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const src = $('Restore Pending Data').first().json;\nconst ig = $('Threads Publish').first().json;\nreturn [{\n  json: {\n    post_uuid: src.post_uuid,\n    published_at: new Date().toISOString(),\n    scheduled_slot: src.scheduled_slot,\n    topic: src.topic,\n    pillar: src.pillar,\n    x_post_id_en: null,\n    x_post_id_ru: null,\n    ig_media_id: ig.id || null,\n    x_text_en: src.x_text_en,\n    x_text_ru: src.x_text_ru,\n    ig_caption_en: src.ig_caption_en,\n    ig_caption_ru: src.ig_caption_ru,\n    slides_en: src.slides_en,\n    slides_ru: src.slides_ru\n  }\n}];"
+      },
+      "id": "b5961d36-257c-47e3-9db3-99d560e26943",
+      "name": "Build Publish Log",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4848,
+        912
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append"
+      },
+      "id": "aece3abe-d3ef-4f09-9c0e-a874c1efd57c",
+      "name": "Append Publish Log",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        4992,
+        912
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.NOTIFY_WEBHOOK_URL}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { status: 'published', post_uuid: $json.post_uuid, topic: $json.topic, slot: $json.scheduled_slot, x_post_id_en: $json.x_post_id_en, ig_media_id: $json.ig_media_id } }}",
+        "options": {}
+      },
+      "id": "93ce0df0-342f-4fbc-acdd-b16c0acecb14",
+      "name": "Notify Success",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        5136,
+        912
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "==https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"chat_id\": \"{{ $env.TELEGRAM_CHAT_ID }}\",\n  \"text\": \"Safety block\\n\\npost_uuid: {{ $('Format + Safety Gate').first().json.post_uuid }}\\nreason: {{ $('Format + Safety Gate').first().json.safety_reason }}\"\n}",
+        "options": {}
+      },
+      "id": "764be2cf-e2d3-49fc-b3b9-0dcc2230a984",
+      "name": "Notify Safety Block",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        5296,
+        752
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"chat_id\": \"{{ $env.TELEGRAM_CHAT_ID }}\",\n  \"text\": \"REJECT\\n\\npost_uuid: {{ $('Restore Pending Data').first().json.post_uuid }}\\ntopic: {{ $('Restore Pending Data').first().json.topic }}\\nreason: {{ $json.note || 'Rejected by human approval' }}\"\n}",
+        "options": {}
+      },
+      "id": "365ac2b0-223e-4d57-822b-c5825e1e21b4",
+      "name": "Notify Rejected",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        224,
+        1120
+      ]
+    },
+    {
+      "parameters": {
+        "content": "REFERENCE IMPLEMENTATION — read docs/after-import.md before running.\n\nn8n does NOT apply this file's `settings` block on import. Timezone and execution-data retention fall back to instance defaults. Set them by hand.\n\nAll domain content is a placeholder. Set NICHE, TOPIC_A, TOPIC_B, HASHTAGS_*, DISCLAIMER_* and the credentials before this produces anything useful.",
+        "height": 342,
+        "width": 420
+      },
+      "id": "efc85838-f775-41b7-b7f1-37163bacf8df",
+      "name": "Notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "path": "approval-callback",
+        "options": {},
+        "authentication": "headerAuth"
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -160,
+        928
+      ],
+      "id": "8fb965b9-e67b-4922-b4b2-b32a9e73bd4b",
+      "name": "Webhook",
+      "webhookId": "",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "Approval Webhook Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "==Approval request\nTopic: {{ $json.topic }}\nAngle: {{ $json.angle }}\nDraft:\n{{ $json.x_text_en }}\nImage preview: {{ $json.cloudinary_url }}\n\nAPPROVE: {{ $env.N8N_WEBHOOK_BASE }}/webhook/approval-callback?action=approve&uuid={{ $json.post_uuid }}&cloudinaryurl={{ $json.cloudinary_url }}&cloudinaryurl2={{ encodeURIComponent($json.cloudinary_url_2) }}&cloudinaryurl3={{ encodeURIComponent($json.cloudinary_url_3) }}&igcaptionen={{ encodeURIComponent($json.ig_caption_en) }}&topic={{ $json.topic }}\nREJECT: {{ $env.N8N_WEBHOOK_BASE }}/webhook/approval-callback?action=reject&uuid={{ $json.post_uuid }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        5168,
+        576
+      ],
+      "id": "443d2c46-0e7a-40a1-8b3f-bd9b046ad358",
+      "name": "Send a text message",
+      "webhookId": "",
+      "alwaysOutputData": true,
+      "credentials": {
+        "telegramApi": {
+          "id": "",
+          "name": "Telegram Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\nstaticData.pending = {};\nconst source = $input.first().json;\nconst cloudinaryUrl = source.cloudinary_url || null;\nconst cloudinaryUrl2 = source.cloudinary_url_2 || null;\nconst cloudinaryUrl3 = source.cloudinary_url_3 || null;\nstaticData.pending = {\n  x_text_en: source.x_text_en,\n  x_text_ru: source.x_text_ru,\n  ig_caption_en: source.ig_caption_en,\n  ig_caption_ru: source.ig_caption_ru,\n  post_uuid: source.post_uuid,\n  topic: source.topic,\n  cloudinary_url: cloudinaryUrl,\n  cloudinary_url_2: cloudinaryUrl2,\n  cloudinary_url_3: cloudinaryUrl3\n};\nconst b64 = source.image_b64;\nif (!b64) {\n  return [{ json: { ...source, cloudinary_url: cloudinaryUrl, cloudinary_url_2: cloudinaryUrl2, cloudinary_url_3: cloudinaryUrl3 } }];\n}\nconst binaryData = {\n  data: b64,\n  mimeType: 'image/png',\n  fileExtension: 'png',\n  fileName: 'preview.png'\n};\nreturn [{\n  json: { ...source, cloudinary_url: cloudinaryUrl, cloudinary_url_2: cloudinaryUrl2, cloudinary_url_3: cloudinaryUrl3 },\n  binary: { image: binaryData }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4992,
+        576
+      ],
+      "id": "1181d257-2011-4d9b-9941-1b74eab5b000",
+      "name": "Convert to Binary"
+    },
+    {
+      "parameters": {
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\nconst pending = staticData.pending || {};\nconst webhookQuery = $input.first().json.query || {};\nreturn [{\n  json: {\n    ...$input.first().json,\n    ig_caption_en: webhookQuery.igcaptionen || pending.ig_caption_en || '',\n    ig_caption_ru: pending.ig_caption_ru || '',\n    x_text_en: pending.x_text_en || '',\n    x_text_ru: pending.x_text_ru || '',\n    post_uuid: webhookQuery.uuid || pending.post_uuid || '',\n    topic: webhookQuery.topic || pending.topic || '',\n    cloudinary_url: webhookQuery.cloudinaryurl || pending.cloudinary_url || null,\n    cloudinary_url_2: webhookQuery.cloudinaryurl2 || pending.cloudinary_url_2 || null,\n    cloudinary_url_3: webhookQuery.cloudinaryurl3 || pending.cloudinary_url_3 || null\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        912
+      ],
+      "id": "65d806a7-c46d-480f-83a6-254cba7d5f13",
+      "name": "Restore Pending Data"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.threads.net/v1.0/me/threads_publish?creation_id={{ $('Code in JavaScript').first().json.id_str }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "options": {}
+      },
+      "id": "d4b3323d-4530-4309-aa34-2f064b948615",
+      "name": "Threads Publish",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        672,
+        912
+      ],
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "",
+          "name": "Threads Query Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.threads.net/v1.0/me/threads",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "={{ $('Restore Pending Data').first().json.ig_caption_en.length }}"
+            },
+            {
+              "name": "media_type",
+              "value": "TEXT"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        384,
+        912
+      ],
+      "id": "512c51f3-1c4e-440b-a5dd-5e8e9f019f8a",
+      "name": "Threads Create Container",
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "",
+          "name": "Threads Query Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json;\nconst id_str = raw.id.toString();\nreturn [{ json: { id_str } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        528,
+        912
+      ],
+      "id": "347df397-35a4-48d8-8f5b-7b209c9a32c1",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.perplexity.ai/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "sonar"
+            },
+            {
+              "name": "messages",
+              "value": "={{ [{\"role\": \"system\", \"content\": \"You are an industry analyst for {{ $env.NICHE }}. Return only a JSON object, no markdown.\"}, {\"role\": \"user\", \"content\": \"What are the top 3 trending topics in {{ $env.NICHE }} right now? Return JSON only: {\\\"trends\\\": [\\\"topic1\\\", \\\"topic2\\\", \\\"topic3\\\"], \\\"keywords\\\": [\\\"kw1\\\", \\\"kw2\\\", \\\"kw3\\\", \\\"kw4\\\", \\\"kw5\\\"]}\"}] }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        208,
+        624
+      ],
+      "id": "b95d8da0-e0f6-4ad3-adab-70e0f1427989",
+      "name": "Perplexity Trends",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "Perplexity API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.choices[0].message.content;\nconst stripped = raw.replace(/```json|```/g, '').trim();\nlet parsed;\ntry {\n  parsed = JSON.parse(stripped);\n} catch(e) {\n  parsed = { trends: [], keywords: [] };\n}\nreturn [{ json: { \n  ...($('Set Config').first().json),\n  trend_topics: parsed.trends || [],\n  trend_keywords: parsed.keywords || []\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        368,
+        624
+      ],
+      "id": "b20092d5-ed3f-4f98-972f-8949f25af354",
+      "name": "Parse Trends"
+    },
+    {
+      "parameters": {
+        "jsCode": "const slot = $json.slot_mode;\nconst trends = $json.trend_topics || [];\nconst keywords = $json.trend_keywords || [];\n\nconst topics18 = [\n  { topic: 'topic_a1', pillar: 'pillar_a', angle: 'replace with your angle', format: 'misconception_break' },\n  { topic: 'topic_a2', pillar: 'pillar_a', angle: 'replace with your angle', format: 'misconception_break' },\n  { topic: 'topic_a3', pillar: 'pillar_a', angle: 'replace with your angle', format: 'simple_explainer' },\n  { topic: 'topic_a4', pillar: 'pillar_a', angle: 'replace with your angle', format: 'misconception_break' }\n];\nconst topics21 = [\n  { topic: 'topic_b1', pillar: 'pillar_b', angle: 'replace with your angle', format: 'comparison' },\n  { topic: 'topic_b2', pillar: 'pillar_b', angle: 'replace with your angle', format: 'psychology' },\n  { topic: 'topic_b3', pillar: 'pillar_b', angle: 'replace with your angle', format: 'psychology' },\n  { topic: 'topic_b4', pillar: 'pillar_b', angle: 'replace with your angle', format: 'comparison' }\n];\n\nconst arr = slot === 'pillar_a' ? topics18 : topics21;\nconst picked = arr[Math.floor(Math.random() * arr.length)];\n\n// append trend keywords to the angle\nconst trendAngle = keywords.length > 0 \n  ? `${picked.angle} (trending: ${keywords.slice(0, 2).join(', ')})`\n  : picked.angle;\n\nreturn [{ json: { \n  ...$json, \n  ...picked, \n  angle: trendAngle,\n  trend_topics: trends,\n  trend_keywords: keywords,\n  post_uuid: `${Date.now()}_${Math.random().toString(36).slice(2,8)}`, \n  scheduled_slot: slot === 'pillar_a' ? (typeof $env !== 'undefined' && $env.SLOT_1 || 'slot_1') : (typeof $env !== 'undefined' && $env.SLOT_2 || 'slot_2') \n} }];"
+      },
+      "id": "02d1165f-52d8-4646-a11c-f07e0aec0d21",
+      "name": "Generate Topic1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        528,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"claude-sonnet-4-5-20250929\",\n  \"max_tokens\": 1200,\n  \"temperature\": 0.3,\n  \"system\": \"You are a content strategist for {{ $env.NICHE }} education on X and Instagram.\\n\\nINSTAGRAM FORMAT (carousel, save-worthy):\\n- hook: Bold conclusion (under 15 words, punchy)\\n- main_point: The core insight with ONE number or formula\\n- bullets: 3 items, each a carousel slide concept (under 100 chars)\\n- closing: Slide 4 CTA — must be a direct question to the reader (e.g. \\\"Which of these have you been getting wrong?\\\" / \\\"Did you know this before today?\\\")\\n\\nX (TWITTER) FORMAT (conversation-starter):\\n- x_hook: Provocative statement OR question (under 120 chars)\\n- x_bullets: Max 2 items, each under 80 chars\\n- x_cta: One specific question that makes readers want to share their experience (e.g. \\\"How long did it take you to notice the pattern?\\\" / \\\"Which example surprised you most?\\\") — must feel personal, not generic\\n- x_closing: under 60 chars\\n\\nCONTENT ANGLE:\\n- Expose the boundary between informed and uninformed audiences\\n- Break ONE misconception per post\\n- Use number comparisons (replace with two rates from your own domain)\\n- Informed-decision framing, never a promise of results\\n\\nNEVER: guaranteed outcomes, easy money, reckless promotion\\nReturn JSON only, no markdown.\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"=Topic: {{ $json.topic }}\\nPillar: {{ $json.pillar }}\\nAngle: {{ $json.angle }}\\nFormat: {{ $json.format }}\\nOutput JSON only:\\n{\\\"hook\\\":\\\"...\\\",\\\"main_point\\\":\\\"...\\\",\\\"bullets\\\":[\\\"...\\\",\\\"...\\\",\\\"...\\\"],\\\"closing\\\":\\\"...\\\",\\\"x_hook\\\":\\\"...\\\",\\\"x_bullets\\\":[\\\"...\\\",\\\"...\\\"],\\\"x_cta\\\":\\\"...\\\",\\\"x_closing\\\":\\\"...\\\",\\\"internal_tag\\\":\\\"...\\\"}\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "fae9b255-a743-4cd7-923b-04f5b5ddef6a",
+      "name": "Claude Generate EN1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        624
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "",
+          "name": "Anthropic API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.threads.net/v1.0/me/threads",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"media_type\": \"TEXT\",\n  \"text\": \"{{ $('Claude Generate Reply1').first().json.content[0].text.replace(/\"/g, '\\\\\"') }}\",\n  \"reply_to_id\": \"{{ $('Threads Publish').first().json.id }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1280,
+        912
+      ],
+      "id": "88c1bb9f-76b6-4ed8-9334-6555e13615f0",
+      "name": "Threads Create Container Reply 1",
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "",
+          "name": "Threads Query Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.threads.net/v1.0/me/threads_publish?creation_id={{ $('Code in JavaScript Reply 1').first().json.id_str }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1760,
+        912
+      ],
+      "id": "ce983dfe-88e9-411e-b3ed-421857592f00",
+      "name": "Threads Publish Reply 1",
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "",
+          "name": "Threads Query Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"model\":\"claude-sonnet-4-5-20250929\",\"max_tokens\":300,\"messages\":[{\"role\":\"user\",\"content\":\"{{ $('Prepare Reply 1').first().json.reply_prompt2 }}\"}]}",
+        "options": {}
+      },
+      "id": "b78e7cac-5cbc-43de-a314-e329e8875c0f",
+      "name": "Claude Generate Reply 2",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1952,
+        912
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "",
+          "name": "Anthropic API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const reply = ($json.content?.[0]?.text || '').replace(/\"/g, \"'\").replace(/\\n/g, ' ');\nreturn [{ json: { reply_2: reply } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2112,
+        912
+      ],
+      "id": "bac229cd-e695-4640-b545-08b62a8aff1b",
+      "name": "Parse Reply2"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.threads.net/v1.0/me/threads_publish?creation_id={{ $('Code in JavaScript Reply 2').first().json.id_str }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2800,
+        912
+      ],
+      "id": "668f3419-89d6-45cf-8447-e7763e3db46c",
+      "name": "Threads Publish Reply 2",
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "",
+          "name": "Threads Query Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const caption = ($('Restore Pending Data').first().json.ig_caption_en || '').replace(/\\n/g, ' ');\nconst prompt1 = 'Explain this post deeper in under 400 characters. Start with emoji. English only. No hashtags: ' + caption;\nconst prompt2 = 'Give a practical example or real-world scenario. End with follow CTA like Follow for more EV education. Under 400 characters. No hashtags. Start with an emoji: ' + caption;\n\nreturn [{\n  json: {\n    reply_prompt: prompt1,\n    reply_prompt2: prompt2\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        944,
+        912
+      ],
+      "id": "c98b276a-d589-4b44-ad43-e08a963331ca",
+      "name": "Prepare Reply 1"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        800,
+        912
+      ],
+      "id": "c163c086-d070-4738-95b1-9778a6573139",
+      "name": "Wait",
+      "webhookId": ""
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"model\":\"claude-sonnet-4-5-20250929\",\"max_tokens\":300,\"messages\":[{\"role\":\"user\",\"content\":\"{{ $json.reply_prompt }}\"}]}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1104,
+        912
+      ],
+      "id": "f7b6b3b6-6e14-4ee1-a16a-6984c42ddeea",
+      "name": "Claude Generate Reply1",
+      "credentials": {
+        "anthropicApi": {
+          "id": "",
+          "name": "Anthropic API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const id = $input.first().json.id;\nreturn [{ json: { id_str: id.toString() } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        912
+      ],
+      "id": "009b777e-0740-4eb9-a197-f25bf3a5768a",
+      "name": "Code in JavaScript Reply 1"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1600,
+        912
+      ],
+      "id": "1aa47546-eeb3-422f-8d97-90e0e5bf00ad",
+      "name": "Wait1",
+      "webhookId": ""
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.threads.net/v1.0/me/threads",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"media_type\": \"TEXT\",\n  \"text\": \"{{ $json.reply_2 }}\",\n  \"reply_to_id\": \"{{ $('Threads Publish Reply 1').first().json.id }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2256,
+        912
+      ],
+      "id": "bd4c5e1c-7f94-488e-997f-0f1f91ed2c74",
+      "name": "Threads Create Container Reply 2",
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "",
+          "name": "Threads Query Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const id = $input.first().json.id;\nreturn [{ json: { id_str: id.toString() } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2432,
+        912
+      ],
+      "id": "e326f105-63e0-4ec7-bf6b-2e1da7e7d1ab",
+      "name": "Code in JavaScript Reply 2"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2608,
+        912
+      ],
+      "id": "4a466ab2-61f0-45a1-96b3-0d115f45f1a3",
+      "name": "Wait2",
+      "webhookId": ""
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"model\":\"claude-sonnet-4-5-20250929\",\"max_tokens\":600,\"messages\":[{\"role\":\"user\",\"content\":\"Create 3 Instagram carousel image prompts based on this post content:\\n\\nTopic: {{ $json.topic }}\\nPost text: {{ $json.ig_caption_en }}\\n\\nSlide 1: Key stat or number from the post as bold infographic. Dark editorial aesthetic, gold text overlays.\\nSlide 2: Data visualization that illustrates the main point. Charts, percentages, dark analytical dashboard.\\nSlide 3: Summary visual with the core insight. Dark design, gold accents, cinematic lighting.\\n\\nNo people faces. No text that contradicts the post. Return ONLY valid JSON: {\\\"prompt_1\\\":\\\"...\\\",\\\"prompt_2\\\":\\\"...\\\",\\\"prompt_3\\\":\\\"...\\\"}\"}]}",
+        "options": {}
+      },
+      "id": "12abdc75-f51a-43d1-8383-36142340c9fe",
+      "name": "Claude Generate Carousel Prompts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2640,
+        624
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "",
+          "name": "Anthropic API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.content?.[0]?.text || '';\nconst clean = raw.replace(/```json|```/g, '').trim();\nconst parsed = JSON.parse(clean);\nreturn [{ json: {\n  ...$('Parse Image Prompt').first().json,\n  prompt_1: parsed.prompt_1,\n  prompt_2: parsed.prompt_2,\n  prompt_3: parsed.prompt_3\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2816,
+        624
+      ],
+      "id": "c5b5c862-a9e0-452d-b814-2842146e3b68",
+      "name": "Parse Carousel Prompts"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.cloudinary.com/v1_1/{{ $env.CLOUDINARY_CLOUD_NAME }}/image/upload",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "file",
+              "value": "=data:image/png;base64,{{ $('OpenAI Generate Image').first().json.data[0].b64_json }}"
+            },
+            {
+              "name": "upload_preset",
+              "value": "={{ $env.CLOUDINARY_UPLOAD_PRESET }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3232,
+        624
+      ],
+      "id": "059d82e5-d4b4-40de-abfe-5e34b762129e",
+      "name": "Upload to Cloudinary 1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/images/generations",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"model\":\"gpt-image-1\",\"prompt\":\"{{ $('Parse Carousel Prompts').first().json.prompt_2 }}\",\"n\":1,\"size\":\"1024x1024\",\"quality\":\"medium\"}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3424,
+        624
+      ],
+      "id": "e9643497-b304-470f-af06-9fb01a27d2ac",
+      "name": "OpenAI Generate Image 2",
+      "credentials": {
+        "openAiApi": {
+          "id": "",
+          "name": "OpenAI API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.cloudinary.com/v1_1/{{ $env.CLOUDINARY_CLOUD_NAME }}/image/upload",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "file",
+              "value": "={{ 'data:image/png;base64,' + $('OpenAI Generate Image 2').first().json.data[0].b64_json }}"
+            },
+            {
+              "name": "upload_preset",
+              "value": "={{ $env.CLOUDINARY_UPLOAD_PRESET }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3632,
+        624
+      ],
+      "id": "26c34904-fdd6-44d8-aca6-f60b55cff21c",
+      "name": "Upload to Cloudinary 2"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/images/generations",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"model\":\"gpt-image-1\",\"prompt\":\"{{ $('Parse Carousel Prompts').first().json.prompt_3 }}\",\"n\":1,\"size\":\"1024x1024\",\"quality\":\"medium\"}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3824,
+        624
+      ],
+      "id": "6783d629-cb7a-4004-93e7-77164363d01c",
+      "name": "OpenAI Generate Image 3",
+      "credentials": {
+        "openAiApi": {
+          "id": "",
+          "name": "OpenAI API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.cloudinary.com/v1_1/{{ $env.CLOUDINARY_CLOUD_NAME }}/image/upload",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "file",
+              "value": "={{ 'data:image/png;base64,' + $('OpenAI Generate Image 3').first().json.data[0].b64_json }}"
+            },
+            {
+              "name": "upload_preset",
+              "value": "={{ $env.CLOUDINARY_UPLOAD_PRESET }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        4032,
+        624
+      ],
+      "id": "13a284a7-f66a-4bc2-9e51-6e0950db53b2",
+      "name": "Upload to Cloudinary 3"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.instagram.com/v21.0/{{ $env.IG_BUSINESS_ACCOUNT_ID }}/media",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"image_url\":\"{{ $('Restore Pending Data').first().json.cloudinary_url_2 }}\",\"is_carousel_item\":true}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3328,
+        912
+      ],
+      "id": "db1d6406-0f9e-428b-abdf-bcbe7775b2a9",
+      "name": "IG Create Container 2",
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "",
+          "name": "Instagram Query Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.instagram.com/v21.0/{{ $env.IG_BUSINESS_ACCOUNT_ID }}/media",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"image_url\":\"{{ $('Restore Pending Data').first().json.cloudinary_url_3 }}\",\"is_carousel_item\":true}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3712,
+        912
+      ],
+      "id": "1b391a59-52fd-4f87-a16d-142f9e53fa61",
+      "name": "IG Create Container 3",
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "",
+          "name": "Instagram Query Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const id1 = $('IG Create Container 1').first().json.id.toString();\nconst id2 = $('IG Create Container 2').first().json.id.toString();\nconst id3 = $('IG Create Container 3').first().json.id.toString();\nreturn [{ json: {\n  children: `${id1},${id2},${id3}`,\n  id1, id2, id3\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3904,
+        912
+      ],
+      "id": "71ebc289-9245-4606-bbcd-0b89bd48d42a",
+      "name": "Code: Collect Container IDs"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.instagram.com/v21.0/{{ $env.IG_BUSINESS_ACCOUNT_ID }}/media",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "media_type",
+              "value": "CAROUSEL"
+            },
+            {
+              "name": "caption",
+              "value": "={{ $('Restore Pending Data').first().json.ig_caption_en }}"
+            },
+            {
+              "name": "children",
+              "value": "={{ $('Code: Collect Container IDs').first().json.children }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        4096,
+        912
+      ],
+      "id": "eafe2f61-3e1e-4324-b425-7aa879e48274",
+      "name": "IG Create Carousel Container",
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "",
+          "name": "Instagram Query Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const id = $input.first().json.id;\nreturn [{ json: { id_str: id.toString() } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4288,
+        912
+      ],
+      "id": "72d0c45c-d70a-4f85-ae8f-e83ba054dbfa",
+      "name": "Code: Carousel ID"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.instagram.com/v21.0/{{ $env.IG_BUSINESS_ACCOUNT_ID }}/media_publish?creation_id={{ $('Code: Carousel ID').first().json.id_str }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        4672,
+        912
+      ],
+      "id": "07cb070c-4c3e-477c-8ef7-637870891ea3",
+      "name": "IG Publish Carousel",
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "",
+          "name": "Instagram Query Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const url1 = $('Upload to Cloudinary 1').first().json.secure_url || null;\nconst url2 = $('Upload to Cloudinary 2').first().json.secure_url || null;\nconst url3 = $('Upload to Cloudinary 3').first().json.secure_url || null;\nconst source = $('Format + Safety Gate').first().json;\nreturn [{ json: {\n  ...source,\n  cloudinary_url: url1,\n  cloudinary_url_2: url2,\n  cloudinary_url_3: url3\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4816,
+        576
+      ],
+      "id": "9e8628f5-6ba8-4f2f-bd4e-8f10c32d53c2",
+      "name": "Collect Cloudinary URLs"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        3504,
+        912
+      ],
+      "id": "dbd1f2d6-56a2-4bed-b7fa-7801c27618f2",
+      "name": "Wait3",
+      "webhookId": ""
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        3168,
+        912
+      ],
+      "id": "543eb99d-7a92-4ce0-8e68-2324d4d90272",
+      "name": "Wait4",
+      "webhookId": ""
+    },
+    {
+      "parameters": {
+        "amount": 30
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        4496,
+        912
+      ],
+      "id": "172dcd36-93f3-4774-9001-b9647f020203",
+      "name": "Wait5",
+      "webhookId": ""
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.instagram.com/v21.0/{{ $env.IG_BUSINESS_ACCOUNT_ID }}/media",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"image_url\":\"{{ $('Restore Pending Data').first().json.cloudinary_url }}\",\"is_carousel_item\":true}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3008,
+        912
+      ],
+      "id": "dc6664b9-4382-422c-8b80-7dc8ae0b2440",
+      "name": "IG Create Container 1",
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "",
+          "name": "Instagram Query Auth"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Set Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Config": {
+      "main": [
+        [
+          {
+            "node": "Perplexity Trends",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse EN JSON": {
+      "main": [
+        [
+          {
+            "node": "Claude Translate (target language)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude Translate (target language)": {
+      "main": [
+        [
+          {
+            "node": "Parse RU JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse RU JSON": {
+      "main": [
+        [
+          {
+            "node": "Claude IG Slides",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude IG Slides": {
+      "main": [
+        [
+          {
+            "node": "Parse Slides JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Slides JSON": {
+      "main": [
+        [
+          {
+            "node": "Claude Visual Extractor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude Visual Extractor": {
+      "main": [
+        [
+          {
+            "node": "Parse Visual JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Visual JSON": {
+      "main": [
+        [
+          {
+            "node": "OpenAI Image Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Image Prompt": {
+      "main": [
+        [
+          {
+            "node": "Parse Image Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Image Prompt": {
+      "main": [
+        [
+          {
+            "node": "Claude Generate Carousel Prompts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Generate Image": {
+      "main": [
+        [
+          {
+            "node": "Upload to Cloudinary 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format + Safety Gate": {
+      "main": [
+        [
+          {
+            "node": "IF Safe?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Safe?": {
+      "main": [
+        [
+          {
+            "node": "Collect Cloudinary URLs",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notify Safety Block",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Approved?": {
+      "main": [
+        [
+          {
+            "node": "Restore Pending Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notify Rejected",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Publish Log": {
+      "main": [
+        [
+          {
+            "node": "Append Publish Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append Publish Log": {
+      "main": [
+        [
+          {
+            "node": "Notify Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a text message": {
+      "main": [
+        []
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "IF Approved?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to Binary": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restore Pending Data": {
+      "main": [
+        [
+          {
+            "node": "Threads Create Container",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Threads Publish": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Threads Create Container": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Threads Publish",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Perplexity Trends": {
+      "main": [
+        [
+          {
+            "node": "Parse Trends",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Trends": {
+      "main": [
+        [
+          {
+            "node": "Generate Topic1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Topic1": {
+      "main": [
+        [
+          {
+            "node": "Claude Generate EN1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude Generate EN1": {
+      "main": [
+        [
+          {
+            "node": "Parse EN JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Threads Create Container Reply 1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript Reply 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Threads Publish Reply 1": {
+      "main": [
+        [
+          {
+            "node": "Claude Generate Reply 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude Generate Reply 2": {
+      "main": [
+        [
+          {
+            "node": "Parse Reply2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Reply2": {
+      "main": [
+        [
+          {
+            "node": "Threads Create Container Reply 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Reply 1": {
+      "main": [
+        [
+          {
+            "node": "Claude Generate Reply1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Prepare Reply 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude Generate Reply1": {
+      "main": [
+        [
+          {
+            "node": "Threads Create Container Reply 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript Reply 1": {
+      "main": [
+        [
+          {
+            "node": "Wait1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait1": {
+      "main": [
+        [
+          {
+            "node": "Threads Publish Reply 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Threads Create Container Reply 2": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript Reply 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript Reply 2": {
+      "main": [
+        [
+          {
+            "node": "Wait2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait2": {
+      "main": [
+        [
+          {
+            "node": "Threads Publish Reply 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Threads Publish Reply 2": {
+      "main": [
+        [
+          {
+            "node": "IG Create Container 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude Generate Carousel Prompts": {
+      "main": [
+        [
+          {
+            "node": "Parse Carousel Prompts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload to Cloudinary 1": {
+      "main": [
+        [
+          {
+            "node": "OpenAI Generate Image 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Carousel Prompts": {
+      "main": [
+        [
+          {
+            "node": "OpenAI Generate Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Generate Image 2": {
+      "main": [
+        [
+          {
+            "node": "Upload to Cloudinary 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload to Cloudinary 2": {
+      "main": [
+        [
+          {
+            "node": "OpenAI Generate Image 3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Generate Image 3": {
+      "main": [
+        [
+          {
+            "node": "Upload to Cloudinary 3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload to Cloudinary 3": {
+      "main": [
+        [
+          {
+            "node": "Format + Safety Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IG Create Container 2": {
+      "main": [
+        [
+          {
+            "node": "Wait3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IG Create Container 3": {
+      "main": [
+        [
+          {
+            "node": "Code: Collect Container IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Collect Container IDs": {
+      "main": [
+        [
+          {
+            "node": "IG Create Carousel Container",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IG Create Carousel Container": {
+      "main": [
+        [
+          {
+            "node": "Code: Carousel ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Carousel ID": {
+      "main": [
+        [
+          {
+            "node": "Wait5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IG Publish Carousel": {
+      "main": [
+        [
+          {
+            "node": "Build Publish Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect Cloudinary URLs": {
+      "main": [
+        [
+          {
+            "node": "Convert to Binary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait3": {
+      "main": [
+        [
+          {
+            "node": "IG Create Container 3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait4": {
+      "main": [
+        [
+          {
+            "node": "IG Create Container 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait5": {
+      "main": [
+        [
+          {
+            "node": "IG Publish Carousel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IG Create Container 1": {
+      "main": [
+        [
+          {
+            "node": "Wait4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "all",
+    "saveManualExecutions": false,
+    "timezone": "UTC",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "nodeGroups": []
+}
